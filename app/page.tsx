@@ -170,7 +170,8 @@ export default function Home() {
           <div key={video.id} style={{ backgroundColor: '#111', borderRadius: '12px', overflow: 'hidden', border: '1px solid #222' }}>
             <div style={{ position: 'relative', cursor: 'pointer' }} onClick={() => setPlayingId(video.youtube_id)}>
               <img src={`https://img.youtube.com/vi/${video.youtube_id}/mqdefault.jpg`} width="100%" alt="Thumbnail" />
-              <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', backgroundColor: 'rgba(0,0,0,0.3)', display: 'flex', justifyContent: 'center', alignItems: 'center', opacity: 0, transition: '0.3s' }} onMouseOver={e => e.currentTarget.style.opacity=1} onMouseOut={e => e.currentTarget.style.opacity=0}>
+              <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', backgroundColor: 'rgba(0,0,0,0.3)', display: 'flex', justifyContent: 'center', alignItems: 'center', opacity: 0, transition: '0.3s' }} onMouseOver={(e) => (e.currentTarget.style.opacity = "1")} 
+onMouseOut={(e) => (e.currentTarget.style.opacity = "0")}>
                 <span style={{ fontSize: '2rem' }}>▶</span>
               </div>
             </div>
