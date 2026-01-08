@@ -177,7 +177,7 @@ export default function Home() {
         )}
       </div>
 
-      <h1 style={{ fontSize: '3.5rem', color: '#ff0000', marginTop: '60px', fontWeight: '900', letterSpacing: '-2px' }}>KR MAD ARCHIVE</h1>
+      <h1 style={{ fontSize: '3.5rem', color: '#ff0000', marginTop: '60px', fontWeight: '900', letterSpacing: '-2px' }}>KR MAD TAGS</h1>
       
       {isBulkMode && (
         <div style={{ backgroundColor: '#ff000022', padding: '15px', borderRadius: '30px', border: '1px solid #ff0000', marginBottom: '30px', display: 'inline-block' }}>
