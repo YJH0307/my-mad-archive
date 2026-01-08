@@ -3,59 +3,45 @@
 import { useState, useEffect } from 'react';
 import { createClient } from '@supabase/supabase-js';
 
-// 1. Supabase 설정
+// 1. Supabase 연결 설정
 const SUPABASE_URL = 'https://qgqdygeuxamtfscakqaf.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFncWR5Z2V1eGFtdGZzY2FrcWFmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc3OTUxNzcsImV4cCI6MjA4MzM3MTE3N30.Z1rwozI8Z0EsJuOo7jCvxxazSA2gtCh3ri-v38OKnso';
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 export default function Home() {
-  // 상태 관리 - 타입을 any[]로 명시하여 에러 해결
+  // 상태 관리
   const [user, setUser] = useState<any>(null);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  
   const [url, setUrl] = useState('');
+  const [title, setTitle] = useState(''); 
+  const [uploader, setUploader] = useState(''); 
   const [thumbnail, setThumbnail] = useState('');
   const [videoId, setVideoId] = useState('');
   const [sourceTag, setSourceTag] = useState('');
   const [musicTag, setMusicTag] = useState('');
   const [extraTags, setExtraTags] = useState('');
-  const [videoList, setVideoList] = useState<any[]>([]); // 타입 에러 방지용 any[]
+  
+  const [videoList, setVideoList] = useState<any[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [playingId, setPlayingId] = useState<string | null>(null);
+
+  // 수정/기여 모드 상태
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editSource, setEditSource] = useState('');
   const [editMusic, setEditMusic] = useState('');
   const [editExtra, setEditExtra] = useState('');
 
-  // 공통 스타일 설정 (모서리 30px로 아주 뭉툭하게)
-  const ROUNDED_PX = '30px';
-  const ROUNDED_SMALL = '15px';
-  const inputStyle: React.CSSProperties = { 
-    padding: '12px 20px', 
-    borderRadius: ROUNDED_PX, 
-    backgroundColor: '#1a1a1a', 
-    color: '#fff', 
-    border: '1px solid #333', 
-    outline: 'none', 
-    fontSize: '0.9rem' 
-  };
-  const btnStyle: React.CSSProperties = { 
-    padding: '12px 24px', 
-    borderRadius: ROUNDED_PX, 
-    cursor: 'pointer', 
-    border: 'none', 
-    fontWeight: 'bold', 
-    fontSize: '0.9rem',
-    transition: '0.2s'
-  };
+  // 디자인 설정 (모서리 40px로 통일)
+  const ROUNDED = '40px';
+  const inputStyle: React.CSSProperties = { padding: '15px 25px', borderRadius: ROUNDED, backgroundColor: '#1a1a1a', color: '#fff', border: '1px solid #333', outline: 'none', fontSize: '1rem', width: '100%', boxSizing: 'border-box' };
+  const btnStyle: React.CSSProperties = { padding: '12px 25px', borderRadius: ROUNDED, cursor: 'pointer', border: 'none', fontWeight: 'bold', fontSize: '0.9rem', transition: '0.3s' };
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => setUser(user));
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
-    });
+    supabase.auth.onAuthStateChange((_event, session) => setUser(session?.user ?? null));
     fetchVideos();
-    return () => subscription.unsubscribe();
   }, []);
 
   const fetchVideos = async () => {
@@ -63,43 +49,50 @@ export default function Home() {
     if (data) setVideoList(data);
   };
 
-  const handleSignUp = async () => {
-    const { error } = await supabase.auth.signUp({ email, password });
-    if (error) alert("실패: " + error.message); 
-    else alert('가입 성공! 이제 로그인 해주세요.');
-  };
-
-  const handleLogin = async () => {
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) alert("로그인 실패: " + error.message);
-  };
-
-  const handleIdentify = () => {
+  // 유튜브 정보 자동 가져오기
+  const handleIdentify = async () => {
     const regExp = /^.*((youtu.be\/)|(v\/)|(\/u\/\w\/)|(embed\/)|(watch\?))\??v?=?([^#&?]*).*/;
     const match = url.match(regExp);
     const id = (match && match[7].length === 11) ? match[7] : '';
+    
     if (id) {
       setVideoId(id);
       setThumbnail(`https://img.youtube.com/vi/${id}/maxresdefault.jpg`);
-    } else { alert('유튜브 링크를 확인해주세요!'); }
+      try {
+        const response = await fetch(`https://noembed.com/embed?url=https://www.youtube.com/watch?v=${id}`);
+        const data = await response.json();
+        setTitle(data.title || '');      
+        setUploader(data.author_name || ''); 
+      } catch (err) {
+        console.error("유튜브 정보를 가져오는데 실패했습니다.", err);
+      }
+    } else { alert('올바른 유튜브 링크를 입력해주세요!'); }
   };
 
+  // 등록 (중복 방지 포함)
   const handleRegister = async () => {
     if (!user) return alert('로그인이 필요합니다!');
     const { error } = await supabase.from('videos').insert([{ 
-      youtube_id: videoId, source_tag: sourceTag, music_tag: musicTag, extra_tags: extraTags, user_id: user.id 
+      youtube_id: videoId, 
+      title: title,
+      user_email: uploader, 
+      source_tag: sourceTag, 
+      music_tag: musicTag, 
+      extra_tags: extraTags, 
+      user_id: user.id
     }]);
 
     if (error) {
       if (error.code === '23505') alert('이미 등록된 영상입니다!');
       else alert("저장 에러: " + error.message);
     } else {
-      alert('성공! 등록되었습니다.');
-      setUrl(''); setThumbnail(''); setSourceTag(''); setMusicTag(''); setExtraTags('');
+      alert('성공! 아카이브에 등록되었습니다.');
+      setUrl(''); setTitle(''); setUploader(''); setThumbnail(''); setSourceTag(''); setMusicTag(''); setExtraTags('');
       fetchVideos();
     }
   };
 
+  // 태그 수정/기여 로직
   const handleUpdateTags = async (video: any) => {
     const isOwner = user.id === video.user_id;
     let finalSource = editSource, finalMusic = editMusic, finalExtra = editExtra;
@@ -117,87 +110,79 @@ export default function Home() {
 
     const { error } = await supabase.from('videos').update({ source_tag: finalSource, music_tag: finalMusic, extra_tags: finalExtra }).eq('id', video.id);
     if (error) alert(error.message);
-    else { alert(isOwner ? '수정 완료!' : '기여 완료!'); setEditingId(null); fetchVideos(); }
+    else { alert('반영되었습니다!'); setEditingId(null); fetchVideos(); }
   };
 
-  const TagChips = ({ tags, color }: { tags: string, color: string }) => {
-    if (!tags) return null;
-    return (
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px', marginTop: '5px' }}>
-        {tags.split(',').map((tag: string, i: number) => (
-          <span key={i} style={{ fontSize: '0.7rem', padding: '4px 12px', borderRadius: '20px', backgroundColor: color + '22', color: color, border: `1px solid ${color}44` }}>
-            #{tag.trim()}
-          </span>
-        ))}
-      </div>
-    );
+  const handleTagClick = (tag: string) => {
+    setSearchTerm(tag.trim());
+    window.scrollTo({ top: 500, behavior: 'smooth' });
   };
 
-  // 3. 필터링 로직 - 타입 에러 해결을 위해 명시적 타입 지정
-  const filteredVideos: any[] = videoList.filter((v: any) => {
-    const combinedTags = (v.source_tag || "") + (v.music_tag || "") + (v.extra_tags || "");
-    return combinedTags.toLowerCase().includes(searchTerm.toLowerCase());
-  });
+  const filteredVideos: any[] = videoList.filter((v: any) => 
+    (v.title + v.source_tag + v.music_tag + (v.extra_tags || '') + (v.user_email || '')).toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
   return (
-    <div style={{ padding: '40px', textAlign: 'center', backgroundColor: '#0a0a0a', color: '#fff', minHeight: '100vh', fontFamily: 'sans-serif' }}>
+    <div style={{ padding: '60px 20px', textAlign: 'center', backgroundColor: '#0a0a0a', color: '#fff', minHeight: '100vh', fontFamily: 'sans-serif' }}>
       
-      {/* 로그인 영역 - 모서리 뭉툭하게 */}
-      <div style={{ position: 'absolute', top: '20px', right: '20px', backgroundColor: '#111', padding: '15px', borderRadius: '20px', border: '1px solid #333', zIndex: 10 }}>
+      {/* 로그인 영역 */}
+      <div style={{ position: 'absolute', top: '20px', right: '20px', backgroundColor: '#161616', padding: '15px', borderRadius: '25px', border: '1px solid #333', zIndex: 10 }}>
         {user ? (
           <div>
-            <div style={{ fontSize: '0.75rem', marginBottom: '8px', color: '#aaa' }}>{user.email}</div>
-            <button onClick={() => supabase.auth.signOut()} style={{ ...btnStyle, padding: '8px 15px', width: '100%', fontSize: '0.8rem', backgroundColor: '#333', color: '#fff' }}>로그아웃</button>
+            <div style={{ fontSize: '0.75rem', color: '#888', marginBottom: '5px' }}>{user.email}</div>
+            <button onClick={() => supabase.auth.signOut()} style={{ ...btnStyle, padding: '5px 15px', width: '100%', fontSize: '0.8rem', backgroundColor: '#333', color: '#fff' }}>로그아웃</button>
           </div>
         ) : (
-          <div>
-            <input placeholder="이메일" value={email} onChange={e => setEmail(e.target.value)} style={{ ...inputStyle, borderRadius: ROUNDED_SMALL, marginBottom: '5px', width: '200px', display: 'block' }} />
-            <input type="password" placeholder="비밀번호" value={password} onChange={e => setPassword(e.target.value)} style={{ ...inputStyle, borderRadius: ROUNDED_SMALL, marginBottom: '10px', width: '200px', display: 'block' }} />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+            <input placeholder="이메일" value={email} onChange={e => setEmail(e.target.value)} style={{ ...inputStyle, padding: '8px 15px', borderRadius: '15px', width: '180px' }} />
+            <input type="password" placeholder="비밀번호" value={password} onChange={e => setPassword(e.target.value)} style={{ ...inputStyle, padding: '8px 15px', borderRadius: '15px', width: '180px' }} />
             <div style={{ display: 'flex', gap: '5px' }}>
-              <button onClick={handleLogin} style={{ ...btnStyle, padding: '8px', flex: 1, backgroundColor: '#444', color: '#fff' }}>로그인</button>
-              <button onClick={handleSignUp} style={{ ...btnStyle, padding: '8px', flex: 1, backgroundColor: '#ff0000', color: '#fff' }}>가입</button>
+              <button onClick={() => supabase.auth.signInWithPassword({email, password})} style={{ ...btnStyle, flex: 1, padding: '8px', backgroundColor: '#444', color: '#fff' }}>로그인</button>
+              <button onClick={() => supabase.auth.signUp({email, password})} style={{ ...btnStyle, flex: 1, padding: '8px', backgroundColor: '#ff0000', color: '#fff' }}>가입</button>
             </div>
           </div>
         )}
       </div>
 
-      <h1 style={{ fontSize: '2.5rem', color: '#ff0000', marginTop: '80px', fontWeight: '900' }}>KR 음MAD ARCHIVE</h1>
-
-      {/* 등록 UI - 입력창과 버튼 모두 뭉툭하게 */}
+      <h1 style={{ fontSize: '3rem', color: '#ff0000', marginTop: '60px', fontWeight: '900', letterSpacing: '-2px' }}>KR MAD ARCHIVE</h1>
+      
+      {/* 등록 UI */}
       {user && (
-        <div style={{ margin: '40px auto', padding: '30px', backgroundColor: '#111', borderRadius: ROUNDED_PX, maxWidth: '520px', border: '1px solid #222', textAlign: 'left' }}>
+        <div style={{ margin: '40px auto', padding: '30px', backgroundColor: '#111', borderRadius: '40px', maxWidth: '550px', border: '1px solid #222', textAlign: 'left' }}>
           <div style={{ display: 'flex', gap: '10px', marginBottom: '15px' }}>
-            <input placeholder="유튜브 링크" value={url} onChange={e => setUrl(e.target.value)} style={{ ...inputStyle, flex: 1 }} />
-            <button onClick={handleIdentify} style={{ ...btnStyle, backgroundColor: '#ff0000', color: '#fff' }}>영상 확인</button>
+            <input placeholder="유튜브 링크 입력" value={url} onChange={e => setUrl(e.target.value)} style={inputStyle} />
+            <button onClick={handleIdentify} style={{ ...btnStyle, backgroundColor: '#ff0000', color: '#fff', whiteSpace: 'nowrap' }}>확인</button>
           </div>
           {thumbnail && (
             <div>
-              <img src={thumbnail} width="100%" style={{ borderRadius: ROUNDED_PX, border: '1px solid #333', marginBottom: '15px' }} />
-              <input placeholder="소스 (쉼표 구분)" value={sourceTag} onChange={e => setSourceTag(e.target.value)} style={{ ...inputStyle, display: 'block', width: '100%', marginBottom: '10px', boxSizing: 'border-box' }} />
-              <input placeholder="원곡 (쉼표 구분)" value={musicTag} onChange={e => setMusicTag(e.target.value)} style={{ ...inputStyle, display: 'block', width: '100%', marginBottom: '10px', boxSizing: 'border-box' }} />
-              <input placeholder="추가 태그 (쉼표 구분)" value={extraTags} onChange={e => setExtraTags(e.target.value)} style={{ ...inputStyle, display: 'block', width: '100%', marginBottom: '20px', boxSizing: 'border-box' }} />
-              <button onClick={handleRegister} style={{ ...btnStyle, width: '100%', backgroundColor: '#fff', color: '#000' }}>아카이브 등록</button>
+              <img src={thumbnail} width="100%" style={{ borderRadius: '30px', marginBottom: '15px', border: '1px solid #333' }} />
+              <input placeholder="영상 제목" value={title} onChange={e => setTitle(e.target.value)} style={{ ...inputStyle, marginBottom: '10px' }} />
+              <input placeholder="업로더 채널명" value={uploader} onChange={e => setUploader(e.target.value)} style={{ ...inputStyle, marginBottom: '10px' }} />
+              <input placeholder="소스 (쉼표 구분)" value={sourceTag} onChange={e => setSourceTag(e.target.value)} style={{ ...inputStyle, marginBottom: '10px' }} />
+              <input placeholder="원곡 (쉼표 구분)" value={musicTag} onChange={e => setMusicTag(e.target.value)} style={{ ...inputStyle, marginBottom: '10px' }} />
+              <input placeholder="추가 태그 (쉼표 구분)" value={extraTags} onChange={e => setExtraTags(e.target.value)} style={{ ...inputStyle, marginBottom: '20px' }} />
+              <button onClick={handleRegister} style={{ ...btnStyle, width: '100%', backgroundColor: '#fff', color: '#000', fontSize: '1.1rem' }}>아카이브 등록</button>
             </div>
           )}
         </div>
       )}
 
-      {/* 검색창 - 아주 뭉툭하게 */}
-      <div style={{ margin: '40px 0' }}>
-        <input placeholder="소스, 원곡, 태그 검색..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} style={{ ...inputStyle, width: '80%', maxWidth: '600px', height: '50px', fontSize: '1.1rem', textAlign: 'center', borderRadius: '50px' }} />
+      {/* 검색창 */}
+      <div style={{ margin: '50px 0' }}>
+        <input placeholder="제목, 채널, 태그 통합 검색..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} style={{ ...inputStyle, width: '85%', maxWidth: '750px', height: '60px', textAlign: 'center', borderRadius: '50px', fontSize: '1.2rem' }} />
       </div>
 
-      {/* 목록 리스트 - 카드와 버튼 모두 뭉툭하게 */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '30px', padding: '0 20px 100px 20px' }}>
+      {/* 목록 리스트 */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '35px', padding: '0 20px 100px 20px' }}>
         {filteredVideos.map((video: any) => (
-          <div key={video.id} style={{ backgroundColor: '#111', borderRadius: ROUNDED_PX, overflow: 'hidden', border: '1px solid #222' }}>
+          <div key={video.id} style={{ backgroundColor: '#111', borderRadius: '40px', overflow: 'hidden', border: '1px solid #222', textAlign: 'left' }}>
             <img src={`https://img.youtube.com/vi/${video.youtube_id}/mqdefault.jpg`} width="100%" onClick={() => setPlayingId(video.youtube_id)} style={{ cursor: 'pointer' }} />
-            <div style={{ padding: '20px' }}>
+            <div style={{ padding: '25px' }}>
               {editingId === video.id ? (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                  <input value={editSource} onChange={e => setEditSource(e.target.value)} style={{ ...inputStyle, borderRadius: ROUNDED_SMALL }} />
-                  <input value={editMusic} onChange={e => setEditMusic(e.target.value)} style={{ ...inputStyle, borderRadius: ROUNDED_SMALL }} />
-                  <input value={editExtra} onChange={e => setEditExtra(e.target.value)} style={{ ...inputStyle, borderRadius: ROUNDED_SMALL }} />
+                  <input value={editSource} onChange={e => setEditSource(e.target.value)} style={{ ...inputStyle, borderRadius: '15px' }} />
+                  <input value={editMusic} onChange={e => setEditMusic(e.target.value)} style={{ ...inputStyle, borderRadius: '15px' }} />
+                  <input value={editExtra} onChange={e => setEditExtra(e.target.value)} style={{ ...inputStyle, borderRadius: '15px' }} />
                   <div style={{ display: 'flex', gap: '10px' }}>
                     <button onClick={() => handleUpdateTags(video)} style={{ ...btnStyle, flex: 1, backgroundColor: '#00ff88', color: '#000' }}>저장</button>
                     <button onClick={() => setEditingId(null)} style={{ ...btnStyle, flex: 1, backgroundColor: '#444', color: '#fff' }}>취소</button>
@@ -205,9 +190,15 @@ export default function Home() {
                 </div>
               ) : (
                 <>
-                  <TagChips tags={video.source_tag} color="#ff0000" />
-                  <TagChips tags={video.music_tag} color="#0070f3" />
-                  <TagChips tags={video.extra_tags} color="#00ff88" />
+                  <h3 style={{ margin: '0 0 8px 0', fontSize: '1.1rem', lineHeight: '1.4' }}>{video.title}</h3>
+                  <p onClick={() => handleTagClick(video.user_email)} style={{ fontSize: '0.85rem', color: '#888', marginBottom: '20px', cursor: 'pointer' }}>📺 {video.user_email}</p>
+                  
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                    {video.source_tag.split(',').map((t:string, i:number) => <span key={i} onClick={() => handleTagClick(t)} style={{ cursor: 'pointer', padding: '5px 15px', borderRadius: '20px', border: '1px solid #ff000066', color: '#ff0000', fontSize: '0.75rem' }}>#{t.trim()}</span>)}
+                    {video.music_tag.split(',').map((t:string, i:number) => <span key={i} onClick={() => handleTagClick(t)} style={{ cursor: 'pointer', padding: '5px 15px', borderRadius: '20px', border: '1px solid #0070f366', color: '#0070f3', fontSize: '0.75rem' }}>#{t.trim()}</span>)}
+                    {video.extra_tags?.split(',').map((t:string, i:number) => <span key={i} onClick={() => handleTagClick(t)} style={{ cursor: 'pointer', padding: '5px 15px', borderRadius: '20px', border: '1px solid #00ff8866', color: '#00ff88', fontSize: '0.75rem' }}>#{t.trim()}</span>)}
+                  </div>
+
                   <div style={{ marginTop: '25px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <button onClick={() => {
                       setEditingId(video.id);
@@ -229,11 +220,11 @@ export default function Home() {
         ))}
       </div>
 
-      {/* 재생 창 */}
+      {/* 재생 모달 */}
       {playingId && (
         <div onClick={() => setPlayingId(null)} style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', backgroundColor: 'rgba(0,0,0,0.92)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000 }}>
-          <div style={{ width: '85%', maxWidth: '900px', aspectRatio: '16/9', position: 'relative' }} onClick={e => e.stopPropagation()}>
-             <iframe width="100%" height="100%" src={`https://www.youtube.com/embed/${playingId}?autoplay=1`} frameBorder="0" allowFullScreen style={{ borderRadius: ROUNDED_PX }}></iframe>
+          <div style={{ width: '85%', maxWidth: '1000px', aspectRatio: '16/9', position: 'relative' }} onClick={e => e.stopPropagation()}>
+             <iframe width="100%" height="100%" src={`https://www.youtube.com/embed/${playingId}?autoplay=1`} frameBorder="0" allowFullScreen style={{ borderRadius: '40px' }}></iframe>
           </div>
         </div>
       )}
