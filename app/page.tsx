@@ -28,6 +28,7 @@ export default function Home() {
   const [editMusic, setEditMusic] = useState('');
   const [editExtra, setEditExtra] = useState('');
 
+  // 디자인 설정 (모서리 40px)
   const ROUNDED = '40px'; 
   const inputStyle: React.CSSProperties = { padding: '15px 25px', borderRadius: ROUNDED, backgroundColor: '#1a1a1a', color: '#fff', border: '1px solid #333', outline: 'none', fontSize: '1rem', width: '100%', boxSizing: 'border-box' };
   const btnStyle: React.CSSProperties = { padding: '12px 25px', borderRadius: ROUNDED, cursor: 'pointer', border: 'none', fontWeight: 'bold', fontSize: '0.9rem' };
@@ -162,10 +163,10 @@ export default function Home() {
             <div style={{ padding: '25px' }}>
               {editingId === video.id ? (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                  <input value={editSource} onChange={e => setEditSource(e.target.value)} style={{ ...inputStyle, borderRadius: '15px' }} />
-                  <input value={editMusic} onChange={e => setEditMusic(e.target.value)} style={{ ...inputStyle, borderRadius: '15px' }} />
-                  <input value={editExtra} onChange={e => setEditExtra(e.target.value)} style={{ ...inputStyle, borderRadius: '15px' }} />
-                  <div style={{ display: 'flex', gap: '10px' }}>
+                  <input value={editSource} onChange={e => setEditSource(e.target.value)} placeholder="소스 태그 (쉼표 구분)" style={{ ...inputStyle, borderRadius: '15px', fontSize: '0.85rem', padding: '10px 15px' }} />
+                  <input value={editMusic} onChange={e => setEditMusic(e.target.value)} placeholder="원곡 태그 (쉼표 구분)" style={{ ...inputStyle, borderRadius: '15px', fontSize: '0.85rem', padding: '10px 15px' }} />
+                  <input value={editExtra} onChange={e => setEditExtra(e.target.value)} placeholder="기타 태그 (쉼표 구분)" style={{ ...inputStyle, borderRadius: '15px', fontSize: '0.85rem', padding: '10px 15px' }} />
+                  <div style={{ display: 'flex', gap: '10px', marginTop: '5px' }}>
                     <button onClick={() => handleUpdateTags(video)} style={{ ...btnStyle, flex: 1, backgroundColor: '#00ff88', color: '#000' }}>저장</button>
                     <button onClick={() => setEditingId(null)} style={{ ...btnStyle, flex: 1, backgroundColor: '#444', color: '#fff' }}>취소</button>
                   </div>
