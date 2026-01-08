@@ -55,6 +55,16 @@ export default function Home() {
     if (error) alert("로그인 실패: " + error.message);
   };
 
+  // ✅ 회원가입 기능 추가
+  const handleSignUp = async () => {
+    const { error } = await supabase.auth.signUp({ email, password });
+    if (error) {
+      alert("회원가입 실패: " + error.message);
+    } else {
+      alert("회원가입 완료! 이메일 인증이 필요할 수 있습니다.");
+    }
+  };
+
   const handleIdentify = async () => {
     const regExp = /^.*((youtu.be\/)|(v\/)|(\/u\/\w\/)|(embed\/)|(watch\?))\??v?=?([^#&?]*).*/;
     const match = url.match(regExp);
@@ -127,11 +137,8 @@ export default function Home() {
     }
   };
 
-  // ✅ [수정된 기여/수정 로직] 누구나 기존 내용을 수정할 수 있게 변경
   const handleUpdateTags = async (video: any) => {
     if (!user) return alert('로그인이 필요합니다!');
-    
-    // 이제 주인이 아니더라도 입력창에 있는 내용(수정된 내용)으로 덮어씁니다.
     const { error } = await supabase.from('videos').update({ 
       source_tag: editSource, 
       music_tag: editMusic, 
@@ -161,7 +168,7 @@ export default function Home() {
   return (
     <div style={{ padding: '60px 20px', textAlign: 'center', backgroundColor: '#0a0a0a', color: '#fff', minHeight: '100vh', fontFamily: 'sans-serif' }}>
       
-      {/* 로그인 바 */}
+      {/* 로그인 및 가입 바 */}
       <div style={{ position: 'absolute', top: '20px', right: '20px', backgroundColor: '#161616', padding: '15px', borderRadius: '25px', border: '1px solid #333', zIndex: 10 }}>
         {user ? (
           <div>
@@ -173,6 +180,8 @@ export default function Home() {
             <input placeholder="이메일" value={email} onChange={e => setEmail(e.target.value)} style={{ ...inputStyle, width: '120px', padding: '8px', borderRadius: '15px' }} />
             <input type="password" placeholder="비번" value={password} onChange={e => setPassword(e.target.value)} style={{ ...inputStyle, width: '120px', padding: '8px', borderRadius: '15px' }} />
             <button onClick={handleLogin} style={{ ...btnStyle, padding: '8px 12px', backgroundColor: '#444', color: '#fff' }}>로그인</button>
+            {/* ✅ 회원가입 버튼 추가 */}
+            <button onClick={handleSignUp} style={{ ...btnStyle, padding: '8px 12px', backgroundColor: '#ff0000', color: '#fff' }}>가입</button>
           </div>
         )}
       </div>
@@ -239,7 +248,6 @@ export default function Home() {
                   <div style={{ marginTop: '20px', display: 'flex', justifyContent: 'space-between' }}>
                     <button onClick={() => { 
                         setEditingId(video.id); 
-                        // ✅ 이제 타인의 영상이라도 기존 내용을 그대로 보여주어 수정하기 쉽게 만듭니다.
                         setEditSource(video.source_tag || ''); 
                         setEditMusic(video.music_tag || ''); 
                         setEditExtra(video.extra_tags || ''); 
