@@ -1,23 +1,21 @@
-import "./globals.css";
-import type { Metadata } from "next";
+import type { Metadata } from 'next'
 
 export const metadata: Metadata = {
-  title: "KR 음MAD TAG",
-  description: "대한민국 음MAD 영상 태그 저장소",
+  title: 'KR 음MAD 태그',
+  description: '음MAD 태그 아카이브 사이트',
   icons: {
-    icon: "/favicon.png", // public 폴더의 파일을 가리킴
+    icon: '/favicon.ico', // 바뀐 파일명에 맞춰 설정했습니다.
   },
-};
+}
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
   return (
     <html lang="ko">
-      <head>
-        <link rel="icon" href="/favicon.ico" />
-      </head>
-      <body style={{ margin: 0, backgroundColor: '#0a0a0a' }}>
-        {children}
-      </body>
+      <body>{children}</body>
     </html>
-  );
+  )
 }
