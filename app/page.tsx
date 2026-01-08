@@ -67,7 +67,7 @@ export default function Home() {
         const data = await res.json();
         setTitle(data.title || ''); setUploader(data.author_name || '');
       } catch (err) { console.error(err); }
-    } else { alert('유튜브 URL을 확인해주세요!'); }
+    } else { alert('URL을 확인해주세요!'); }
   };
 
   const fetchPlaylistVideos = async (token?: string) => {
@@ -88,7 +88,7 @@ export default function Home() {
       setNextPageToken(data.nextPageToken || null);
       setBulkQueue(extracted); setBulkIndex(0); setIsBulkMode(true);
       if(extracted.length > 0) loadBulkVideo(extracted[0]);
-    } catch (e) { alert('API 호출 에러'); }
+    } catch (e) { alert('API 에러'); }
   };
 
   const loadBulkVideo = (video: any) => {
@@ -117,25 +117,33 @@ export default function Home() {
       youtube_id: videoId, title, user_email: uploader, 
       source_tag: sourceTag, music_tag: musicTag, extra_tags: extraTags, user_id: user.id
     }]);
-    if (error) alert(error.message);
-    else { if (isBulkMode) skipToNext(); else { alert('등록 성공!'); setVideoId(''); setUrl(''); fetchVideos(); } }
+
+    if (error) {
+      if (error.code === '23505') alert('이미 등록된 영상입니다!');
+      else alert(error.message);
+    } else {
+      if (isBulkMode) skipToNext(); 
+      else { alert('등록 성공!'); setVideoId(''); setUrl(''); fetchVideos(); }
+    }
   };
 
+  // ✅ [수정된 기여/수정 로직] 누구나 기존 내용을 수정할 수 있게 변경
   const handleUpdateTags = async (video: any) => {
-    const isOwner = user.id === video.user_id;
-    let finalSource = editSource, finalMusic = editMusic, finalExtra = editExtra;
-    if (!isOwner) {
-      const combine = (old: string, add: string) => {
-        const oldSet = new Set((old || "").split(',').map(s => s.trim()).filter(Boolean));
-        add.split(',').map(s => s.trim()).filter(Boolean).forEach(tag => oldSet.add(tag));
-        return Array.from(oldSet).join(', ');
-      };
-      finalSource = combine(video.source_tag, editSource);
-      finalMusic = combine(video.music_tag, editMusic);
-      finalExtra = combine(video.extra_tags || '', editExtra);
+    if (!user) return alert('로그인이 필요합니다!');
+    
+    // 이제 주인이 아니더라도 입력창에 있는 내용(수정된 내용)으로 덮어씁니다.
+    const { error } = await supabase.from('videos').update({ 
+      source_tag: editSource, 
+      music_tag: editMusic, 
+      extra_tags: editExtra 
+    }).eq('id', video.id);
+
+    if (error) alert(error.message); 
+    else { 
+      alert(user.id === video.user_id ? '수정 완료!' : '기여 감사합니다!'); 
+      setEditingId(null); 
+      fetchVideos(); 
     }
-    const { error } = await supabase.from('videos').update({ source_tag: finalSource, music_tag: finalMusic, extra_tags: finalExtra }).eq('id', video.id);
-    if (error) alert(error.message); else { alert('반영 완료!'); setEditingId(null); fetchVideos(); }
   };
 
   const handleTagClick = (tag: string) => {
@@ -143,26 +151,17 @@ export default function Home() {
     window.scrollTo({ top: 500, behavior: 'smooth' });
   };
 
-  // ✅ [수정된 로직]: 검색어와 데이터의 공백을 모두 제거하고 비교 (띄어쓰기 무시)
   const filteredVideos = videoList.filter((v: any) => {
-    // 검색어에서 공백 제거 및 소문자화
     const normalizedSearch = searchTerm.replace(/\s+/g, '').toLowerCase();
     if (!normalizedSearch) return true;
-
-    // 데이터의 각 필드에서 공백 제거 및 소문자화하여 비교
     const check = (val: string) => (val || "").replace(/\s+/g, '').toLowerCase().includes(normalizedSearch);
-
-    return check(v.title) || 
-           check(v.user_email) || 
-           check(v.source_tag) || 
-           check(v.music_tag) || 
-           check(v.extra_tags);
+    return check(v.title) || check(v.user_email) || check(v.source_tag) || check(v.music_tag) || check(v.extra_tags);
   });
 
   return (
     <div style={{ padding: '60px 20px', textAlign: 'center', backgroundColor: '#0a0a0a', color: '#fff', minHeight: '100vh', fontFamily: 'sans-serif' }}>
       
-      {/* 1. 로그인 바 */}
+      {/* 로그인 바 */}
       <div style={{ position: 'absolute', top: '20px', right: '20px', backgroundColor: '#161616', padding: '15px', borderRadius: '25px', border: '1px solid #333', zIndex: 10 }}>
         {user ? (
           <div>
@@ -193,7 +192,7 @@ export default function Home() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
               <input placeholder="유튜브 영상 또는 재생목록 URL" value={url} onChange={e => setUrl(e.target.value)} style={inputStyle} />
               <div style={{ display: 'flex', gap: '10px' }}>
-                <button onClick={handleIdentify} style={{ ...btnStyle, flex: 1, backgroundColor: '#333', color: '#fff' }}>단일 확인</button>
+                <button onClick={handleIdentify} style={{ ...btnStyle, flex: 1, backgroundColor: '#333', color: '#fff' }}>단일 영상 확인</button>
                 <button onClick={() => fetchPlaylistVideos()} style={{ ...btnStyle, flex: 1, backgroundColor: '#ff0000', color: '#fff' }}>재생목록 추출</button>
               </div>
             </div>
@@ -212,9 +211,8 @@ export default function Home() {
         </div>
       )}
 
-      {/* 검색창 */}
       <div style={{ margin: '40px 0' }}>
-        <input placeholder="띄어쓰기 없이 검색해도 나옵니다!" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} style={{ ...inputStyle, width: '85%', maxWidth: '750px', height: '60px', textAlign: 'center', borderRadius: '50px', fontSize: '1.2rem' }} />
+        <input placeholder="띄어쓰기 없이 검색해도 나옵니다!" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} style={{ ...inputStyle, width: '85%', maxWidth: '750px', height: '60px', textAlign: 'center', borderRadius: '50px' }} />
       </div>
       
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '35px', padding: '0 20px 100px 20px' }}>
@@ -224,27 +222,27 @@ export default function Home() {
             <div style={{ padding: '25px' }}>
               {editingId === video.id ? (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                  <input value={editSource} onChange={e => setEditSource(e.target.value)} placeholder="소스 태그" style={{ ...inputStyle, borderRadius: '15px', padding: '10px', fontSize: '0.85rem' }} />
-                  <input value={editMusic} onChange={e => setEditMusic(e.target.value)} placeholder="원곡 태그" style={{ ...inputStyle, borderRadius: '15px', padding: '10px', fontSize: '0.85rem' }} />
-                  <input value={editExtra} onChange={e => setEditExtra(e.target.value)} placeholder="기타 태그" style={{ ...inputStyle, borderRadius: '15px', padding: '10px', fontSize: '0.85rem' }} />
-                  <div style={{ display: 'flex', gap: '5px' }}><button onClick={() => handleUpdateTags(video)} style={{ ...btnStyle, flex: 1, backgroundColor: '#00ff88', color: '#000' }}>저장</button><button onClick={() => setEditingId(null)} style={{ ...btnStyle, flex: 1, backgroundColor: '#333' }}>취소</button></div>
+                  <input value={editSource} onChange={e => setEditSource(e.target.value)} placeholder="소스 태그 수정" style={{ ...inputStyle, borderRadius: '15px', padding: '10px', fontSize: '0.85rem' }} />
+                  <input value={editMusic} onChange={e => setEditMusic(e.target.value)} placeholder="원곡 태그 수정" style={{ ...inputStyle, borderRadius: '15px', padding: '10px', fontSize: '0.85rem' }} />
+                  <input value={editExtra} onChange={e => setEditExtra(e.target.value)} placeholder="기타 태그 수정" style={{ ...inputStyle, borderRadius: '15px', padding: '10px', fontSize: '0.85rem' }} />
+                  <div style={{ display: 'flex', gap: '5px' }}><button onClick={() => handleUpdateTags(video)} style={{ ...btnStyle, flex: 1, backgroundColor: '#00ff88', color: '#000' }}>저장하기</button><button onClick={() => setEditingId(null)} style={{ ...btnStyle, flex: 1, backgroundColor: '#333' }}>취소</button></div>
                 </div>
               ) : (
                 <>
-                  <h3 style={{ fontSize: '1.1rem', marginBottom: '8px', lineHeight: '1.4' }}>{video.title}</h3>
+                  <h3 style={{ fontSize: '1.1rem', marginBottom: '8px' }}>{video.title}</h3>
                   <p onClick={() => handleTagClick(video.user_email)} style={{ fontSize: '0.85rem', color: '#888', marginBottom: '18px', cursor: 'pointer' }}>📺 {video.user_email}</p>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
                     {video.source_tag?.split(',').map((t:any, i:any) => <span key={i} onClick={() => handleTagClick(t)} style={{ cursor: 'pointer', padding: '5px 12px', borderRadius: '20px', border: '1px solid #ff000066', color: '#ff0000', fontSize: '0.75rem' }}>#{t.trim()}</span>)}
                     {video.music_tag?.split(',').map((t:any, i:any) => <span key={i} onClick={() => handleTagClick(t)} style={{ cursor: 'pointer', padding: '5px 12px', borderRadius: '20px', border: '1px solid #0070f366', color: '#0070f3', fontSize: '0.75rem' }}>#{t.trim()}</span>)}
                     {video.extra_tags?.split(',').map((t:any, i:any) => <span key={i} onClick={() => handleTagClick(t)} style={{ cursor: 'pointer', padding: '5px 12px', borderRadius: '20px', border: '1px solid #00ff8866', color: '#00ff88', fontSize: '0.75rem' }}>#{t.trim()}</span>)}
                   </div>
-                  <div style={{ marginTop: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div style={{ marginTop: '20px', display: 'flex', justifyContent: 'space-between' }}>
                     <button onClick={() => { 
-                      setEditingId(video.id); 
-                      const isMe = user?.id === video.user_id;
-                      setEditSource(isMe ? video.source_tag : ''); 
-                      setEditMusic(isMe ? video.music_tag : ''); 
-                      setEditExtra(isMe ? video.extra_tags || '' : ''); 
+                        setEditingId(video.id); 
+                        // ✅ 이제 타인의 영상이라도 기존 내용을 그대로 보여주어 수정하기 쉽게 만듭니다.
+                        setEditSource(video.source_tag || ''); 
+                        setEditMusic(video.music_tag || ''); 
+                        setEditExtra(video.extra_tags || ''); 
                     }} style={{ ...btnStyle, padding: '7px 18px', fontSize: '0.8rem', backgroundColor: '#222', color: '#fff' }}>
                       {user?.id === video.user_id ? '정보 수정' : '태그 기여'}
                     </button>
